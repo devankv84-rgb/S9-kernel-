@@ -64,13 +64,13 @@ jobs:
             sed -i '/source.*fs\/sdcardfs\/Kconfig/d' fs/Kconfig || true
           fi
           
-          # Create placeholder for missing proprietary Samsung uh.elf binary blob
-          echo "Creating placeholder init/uh.elf..."
-          mkdir -p init
+          # Create out directory and placeholders for uh.elf in both source and output paths
+          echo "Creating placeholders for proprietary Samsung uh.elf binary blob..."
+          mkdir -p init out/init
           touch init/uh.elf
+          touch out/init/uh.elf
           
           echo "Starting kernel build for Exynos 9810 (star2lte) using GCC 4.9..."
-          mkdir -p out
           
           # Apply the defconfig with HOSTCFLAGS="-fcommon" to fix modern host compiler dtc errors
           make O=out HOSTCFLAGS="-fcommon" exynos9810-star2lte_defconfig
