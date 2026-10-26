@@ -59,8 +59,8 @@ jobs:
           echo "Starting kernel build for Exynos 9810 (star2lte) using GCC 4.9..."
           mkdir -p out
           
-          # Apply the Exynos9810 defconfig
-          make O=out Exynos9810-star2lte_defconfig
+          # Apply the correct lowercase defconfig
+          make O=out exynos9810-star2lte_defconfig
           
           # Set custom localversion
           scripts/config --file out/.config --set-str LOCALVERSION "-iam_devu"
@@ -78,3 +78,4 @@ jobs:
             kernel-src/out/arch/arm64/boot/dts/exynos/*.dtb
             kernel-src/out/arch/arm64/boot/dtbo.img
             kernel-src/out/.config
+            
