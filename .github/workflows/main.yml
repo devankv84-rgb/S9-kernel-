@@ -64,6 +64,11 @@ jobs:
             sed -i '/source.*fs\/sdcardfs\/Kconfig/d' fs/Kconfig || true
           fi
           
+          # Create placeholder for missing proprietary Samsung uh.elf binary blob
+          echo "Creating placeholder init/uh.elf..."
+          mkdir -p init
+          touch init/uh.elf
+          
           echo "Starting kernel build for Exynos 9810 (star2lte) using GCC 4.9..."
           mkdir -p out
           
