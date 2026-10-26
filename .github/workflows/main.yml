@@ -67,15 +67,15 @@ jobs:
           echo "Starting kernel build for Exynos 9810 (star2lte) using GCC 4.9..."
           mkdir -p out
           
-          # Apply the defconfig
-          make O=out exynos9810-star2lte_defconfig
+          # Apply the defconfig with HOSTCFLAGS="-fcommon" to fix modern host compiler dtc errors
+          make O=out HOSTCFLAGS="-fcommon" exynos9810-star2lte_defconfig
           
           # Set custom localversion
           scripts/config --file out/.config --set-str LOCALVERSION "-iam_devu"
-          make O=out olddefconfig
+          make O=out HOSTCFLAGS="-fcommon" olddefconfig
           
-          # Compile kernel using all available cores
-          make O=out -j$(nproc)
+          # Compile kernel using all available cores with HOSTCFLAGS="-fcommon"
+          make O=out HOSTCFLAGS="-fcommon" -j$(nproc)
 
       - name: Archive Kernel Artifacts
         uses: actions/upload-artifact@v4
