@@ -1,4 +1,4 @@
-name: Compile Kernel (Star2lte - GCC 4.9 - GDrive Source)
+name: Compile Samsung OSC Kernel (Star2lte - GCC 4.9)
 
 on:
   workflow_dispatch:
@@ -33,9 +33,10 @@ jobs:
 
       - name: Download Kernel Source from Google Drive
         run: |
-          echo "Downloading kernel source zip from Google Drive..."
+          echo "Downloading official Samsung OSC kernel source..."
           pip install gdown
           
+          # Replace with your Google Drive file ID if it changed
           gdown "https://drive.google.com/uc?id=1b9fXwpUTxZzOSv2o8A6MuW4_xhVJsP8c" -O kernel.zip
           
           echo "Extracting kernel source..."
@@ -58,34 +59,23 @@ jobs:
           
           cd kernel-src
           
-          # Fix potential sdcardfs recursive inclusion issue if present
-          if [ -f fs/sdcardfs/Kconfig ]; then
-            echo "Checking/fixing sdcardfs Kconfig recursive inclusion..."
-            sed -i '/source.*fs\/sdcardfs\/Kconfig/d' fs/Kconfig || true
-          fi
+          echo "Starting kernel build for Exynos 9810 (star2lte) using official OSC source..."
+          mkdir -p out
           
-          # Create out directory and placeholders for uh.elf in both source and output paths
-          echo "Creating placeholders for proprietary Samsung uh.elf binary blob..."
-          mkdir -p init out/init
-          touch init/uh.elf
-          touch out/init/uh.elf
-          
-          echo "Starting kernel build for Exynos 9810 (star2lte) using GCC 4.9..."
-          
-          # Apply the defconfig with HOSTCFLAGS="-fcommon" to fix modern host compiler dtc errors
+          # Apply the defconfig (adjust name if your OSC source uses a slightly different variant name)
           make O=out HOSTCFLAGS="-fcommon" exynos9810-star2lte_defconfig
           
           # Set custom localversion
           scripts/config --file out/.config --set-str LOCALVERSION "-iam_devu"
           make O=out HOSTCFLAGS="-fcommon" olddefconfig
           
-          # Compile kernel using all available cores with HOSTCFLAGS="-fcommon"
+          # Compile kernel using all available cores
           make O=out HOSTCFLAGS="-fcommon" -j$(nproc)
 
       - name: Archive Kernel Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: star2lte-kernel-gcc49-artifacts
+          name: star2lte-osc-kernel-artifacts
           path: |
             kernel-src/out/arch/arm64/boot/Image
             kernel-src/out/arch/arm64/boot/dts/exynos/*.dtb
