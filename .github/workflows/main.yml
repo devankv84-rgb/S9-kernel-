@@ -30,8 +30,8 @@ jobs:
           echo "Downloading kernel source zip from Google Drive..."
           pip install gdown
           
-          # Downloading using the direct file ID URL without fuzzy matching
-          gdown "https://drive.google.com/uc?id=1bqaKgTB85l5rYmFuNt6PMDl3qvt2BaKM" -O kernel.zip
+          # Downloading using the new direct file ID URL
+          gdown "https://drive.google.com/uc?id=1WW0mLpZwHvSDrt_VFJF4M1sMiQm2X7hw" -O kernel.zip
           
           echo "Verifying downloaded file..."
           ls -lh kernel.zip
@@ -78,4 +78,3 @@ jobs:
             kernel-src/out/arch/arm64/boot/dts/exynos/*.dtb
             kernel-src/out/arch/arm64/boot/dtbo.img
             kernel-src/out/.config
-            
