@@ -30,7 +30,6 @@ jobs:
           echo "Downloading kernel source zip from Google Drive..."
           pip install gdown
           
-          # Downloading using the new direct file ID URL
           gdown "https://drive.google.com/uc?id=1WW0mLpZwHvSDrt_VFJF4M1sMiQm2X7hw" -O kernel.zip
           
           echo "Verifying downloaded file..."
@@ -39,7 +38,6 @@ jobs:
           
           echo "Extracting kernel source..."
           unzip -q kernel.zip -d kernel-src
-          cd kernel-src
 
       - name: Setup GCC 4.9 Toolchains
         run: |
@@ -51,10 +49,12 @@ jobs:
         env:
           ARCH: arm64
           SUBARCH: arm64
-          PATH: ${{ github.workspace }}/toolchain/aarch64/bin:${{ github.workspace }}/toolchain/arm32/bin:$PATH
           CROSS_COMPILE: aarch64-linux-android-
           CROSS_COMPILE_ARM32: arm-linux-androideabi-
         run: |
+          # Properly prepend toolchain paths while preserving system binaries like mkdir
+          export PATH="${{ github.workspace }}/toolchain/aarch64/bin:${{ github.workspace }}/toolchain/arm32/bin:$PATH"
+          
           cd kernel-src
           echo "Starting kernel build for Exynos 9810 (star2lte) using GCC 4.9..."
           mkdir -p out
