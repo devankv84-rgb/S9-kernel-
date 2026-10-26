@@ -30,8 +30,8 @@ jobs:
           echo "Downloading kernel source zip from Google Drive..."
           pip install gdown
           
-          # Using --fuzzy with the full URL handles large file virus warning confirmations automatically
-          gdown --fuzzy "https://drive.google.com/file/d/1YS6Y7nK6pu66-8i8LwsZZD8XyvLWYS4a/view?usp=drivesdk" -O kernel.zip
+          # Downloading using the direct file ID URL without fuzzy matching
+          gdown "https://drive.google.com/uc?id=1bqaKgTB85l5rYmFuNt6PMDl3qvt2BaKM" -O kernel.zip
           
           echo "Verifying downloaded file..."
           ls -lh kernel.zip
