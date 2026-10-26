@@ -30,7 +30,7 @@ jobs:
           echo "Downloading kernel source zip from Google Drive..."
           pip install gdown
           
-          gdown "https://drive.google.com/uc?id=1WW0mLpZwHvSDrt_VFJF4M1sMiQm2X7hw" -O kernel.zip
+          gdown "https://drive.google.com/uc?id=1b9fXwpUTxZzOSv2o8A6MuW4_xhVJsP8c" -O kernel.zip
           
           echo "Extracting kernel source..."
           unzip -q kernel.zip -d kernel-src
@@ -58,7 +58,6 @@ jobs:
           echo "Starting kernel build..."
           mkdir -p out
           
-          # If the defconfig name differs, change it here based on the list above
           make O=out exynos9810-star2lte_defconfig
           
           # Set custom localversion
