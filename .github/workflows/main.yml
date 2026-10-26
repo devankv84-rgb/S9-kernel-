@@ -6,6 +6,12 @@ on:
 jobs:
   build-kernel:
     runs-on: ubuntu-latest
+    env:
+      ARCH: arm64
+      SUBARCH: arm64
+      CROSS_COMPILE: aarch64-linux-android-
+      CROSS_COMPILE_ARM32: arm-linux-androideabi-
+      ANDROID_MAJOR_VERSION: s
     steps:
       - name: Install Dependencies
         run: |
@@ -34,6 +40,10 @@ jobs:
           
           echo "Extracting kernel source..."
           unzip -q kernel.zip -d kernel-src
+          
+          echo "Fixing file timestamps to prevent clock skew warnings..."
+          cd kernel-src
+          find . -exec touch {} +
 
       - name: Setup GCC 4.9 Toolchains
         run: |
@@ -42,25 +52,22 @@ jobs:
           git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 toolchain/arm32
 
       - name: Build Kernel
-        env:
-          ARCH: arm64
-          SUBARCH: arm64
-          CROSS_COMPILE: aarch64-linux-android-
-          CROSS_COMPILE_ARM32: arm-linux-androideabi-
         run: |
+          # Properly prepend toolchain paths while preserving system binaries like mkdir
           export PATH="${{ github.workspace }}/toolchain/aarch64/bin:${{ github.workspace }}/toolchain/arm32/bin:$PATH"
           
           cd kernel-src
           
-          # Fix potential sdcardfs recursive inclusion issue if the file exists
+          # Fix potential sdcardfs recursive inclusion issue if present
           if [ -f fs/sdcardfs/Kconfig ]; then
             echo "Checking/fixing sdcardfs Kconfig recursive inclusion..."
             sed -i '/source.*fs\/sdcardfs\/Kconfig/d' fs/Kconfig || true
           fi
           
-          echo "Starting kernel build..."
+          echo "Starting kernel build for Exynos 9810 (star2lte) using GCC 4.9..."
           mkdir -p out
           
+          # Apply the defconfig
           make O=out exynos9810-star2lte_defconfig
           
           # Set custom localversion
