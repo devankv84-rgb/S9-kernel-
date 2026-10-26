@@ -52,8 +52,11 @@ jobs:
           
           cd kernel-src
           
-          echo "=== Listing available defconfigs ==="
-          ls -la arch/arm64/configs/
+          # Fix potential sdcardfs recursive inclusion issue if the file exists
+          if [ -f fs/sdcardfs/Kconfig ]; then
+            echo "Checking/fixing sdcardfs Kconfig recursive inclusion..."
+            sed -i '/source.*fs\/sdcardfs\/Kconfig/d' fs/Kconfig || true
+          fi
           
           echo "Starting kernel build..."
           mkdir -p out
