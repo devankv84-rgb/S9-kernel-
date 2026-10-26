@@ -28,9 +28,14 @@ jobs:
       - name: Download Kernel Source from Google Drive
         run: |
           echo "Downloading kernel source zip from Google Drive..."
-          # Using gdown to fetch the file securely via its file ID
           pip install gdown
-          gdown 1YS6Y7nK6pu66-8i8LwsZZD8XyvLWYS4a -O kernel.zip
+          
+          # Using --fuzzy with the full URL handles large file virus warning confirmations automatically
+          gdown --fuzzy "https://drive.google.com/file/d/1YS6Y7nK6pu66-8i8LwsZZD8XyvLWYS4a/view?usp=drivesdk" -O kernel.zip
+          
+          echo "Verifying downloaded file..."
+          ls -lh kernel.zip
+          file kernel.zip
           
           echo "Extracting kernel source..."
           unzip -q kernel.zip -d kernel-src
