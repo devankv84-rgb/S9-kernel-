@@ -1,4 +1,4 @@
-name: Compile Samsung OSC Kernel (Star2lte - GCC 4.9)
+name: Compile Exynos 9810 Kernel (Official OSR Source - star2lte)
 
 on:
   workflow_dispatch:
@@ -33,48 +33,42 @@ jobs:
             tar \
             file
 
-      - name: Download and Extract OSC Kernel Source
+      - name: Download and Extract Kernel Source Zip
         run: |
-          echo "Downloading official Samsung OSC kernel source from GitHub Releases..."
-          wget -O kernel-archive "https://github.com/devankv84-rgb/S9-kernel-/releases/download/V1/SM-G965F_QQ_Opensource.zip"
+          echo "Downloading kernel source zip from release..."
+          wget -O kernel-source.zip "https://github.com/devankv84-rgb/S9-kernel-/releases/download/V1/SM-G965F_QQ_Opensource.zip"
           
-          echo "Preparing source directories..."
-          mkdir -p kernel-src kernel-src-raw kernel-src-inner
+          echo "Extracting zip archive..."
+          mkdir -p temp_extracted
+          unzip -q kernel-source.zip -d temp_extracted
           
-          echo "Extracting outer zip archive..."
-          unzip -q kernel-archive -d kernel-src-raw
+          echo "Contents of extracted archive:"
+          ls -la temp_extracted
           
-          echo "Checking for inner tar/gz archives..."
-          INNER_TAR=$(find kernel-src-raw -name "*.tar.gz" -o -name "*.tgz" -o -name "*.tar" | head -n 1)
+          # Handle Samsung OSR packaging structure (which often wraps an inner tar/tar.gz or raw folders)
+          INNER_ARCHIVE=$(find temp_extracted -name "*.tar.gz" -o -name "*.tar" | head -n 1)
           
-          if [ -n "$INNER_TAR" ]; then
-            echo "Found inner archive: $INNER_TAR. Extracting..."
-            tar -xf "$INNER_TAR" -C kernel-src-inner
-            
-            # Flatten inner archive contents into kernel-src
-            cd kernel-src-inner
-            ITEM_COUNT=$(ls -A | wc -l)
-            if [ "$ITEM_COUNT" -eq 1 ] && [ -d "$(ls -A)" ]; then
-              SINGLE_DIR=$(ls -A)
-              mv "$SINGLE_DIR"/* ../kernel-src/
-              mv "$SINGLE_DIR"/.[!.]* ../kernel-src/ 2>/dev/null || true
-            else
-              mv * ../kernel-src/
-              mv .[!.]* ../kernel-src/ 2>/dev/null || true
-            fi
-            cd ..
+          if [ -n "$INNER_ARCHIVE" ]; then
+            echo "Found inner archive: $INNER_ARCHIVE. Extracting..."
+            tar -xf "$INNER_ARCHIVE" -C .
+            SRC_DIR=$(tar -tf "$INNER_ARCHIVE" | head -n 1 | cut -f1 -d"/")
+            mv "$SRC_DIR" kernel-src
           else
-            cd kernel-src-raw
-            ITEM_COUNT=$(ls -A | wc -l)
-            if [ "$ITEM_COUNT" -eq 1 ] && [ -d "$(ls -A)" ]; then
-              SINGLE_DIR=$(ls -A)
-              mv "$SINGLE_DIR"/* ../kernel-src/
-              mv "$SINGLE_DIR"/.[!.]* ../kernel-src/ 2>/dev/null || true
+            # If the zip extracts directly into a source folder
+            FIRST_ITEM=$(ls -1 temp_extracted | head -n 1)
+            if [ -d "temp_extracted/$FIRST_ITEM" ]; then
+              mv "temp_extracted/$FIRST_ITEM" kernel-src
             else
-              mv * ../kernel-src/
-              mv .[!.]* ../kernel-src/ 2>/dev/null || true
+              mv temp_extracted kernel-src
             fi
-            cd ..
+          fi
+          
+          echo "Verifying init/uh.elf presence in official source..."
+          if [ -f "kernel-src/init/uh.elf" ]; then
+            echo "SUCCESS: uh.elf is present in init/ directory."
+          else
+            echo "WARNING: uh.elf not found in init/ directory. Checking tree..."
+            find kernel-src -name "uh.elf"
           fi
           
           echo "Fixing file timestamps to prevent clock skew warnings..."
@@ -89,7 +83,6 @@ jobs:
 
       - name: Build Kernel
         run: |
-          # Properly prepend toolchain paths while preserving system binaries like mkdir
           export PATH="${{ github.workspace }}/toolchain/aarch64/bin:${{ github.workspace }}/toolchain/arm32/bin:$PATH"
           
           cd kernel-src
@@ -97,27 +90,27 @@ jobs:
           echo "Available defconfigs for Exynos 9810:"
           ls -l arch/arm64/configs/ | grep -iE "star|exynos9810"
           
-          echo "Starting kernel build for Exynos 9810 (star2lte) using Samsung OSC source..."
+          echo "Starting kernel build for Exynos 9810 (star2lte)..."
           mkdir -p out
           
-          # Dynamically find the correct star2lte defconfig file name
+          # Dynamically discover the correct star2lte defconfig file name
           DEFCONFIG_NAME=$(ls arch/arm64/configs/ | grep -iE "star2lte|starlte" | head -n 1)
           echo "Using discovered defconfig: $DEFCONFIG_NAME"
           
-          # Apply the defconfig with HOSTCFLAGS="-fcommon" for modern host compiler compatibility
+          # Apply defconfig with HOSTCFLAGS="-fcommon" for host tool compatibility
           make O=out HOSTCFLAGS="-fcommon" "$DEFCONFIG_NAME"
           
-          # Set custom localversion
+          # Set custom localversion suffix to -iam_devu
           scripts/config --file out/.config --set-str LOCALVERSION "-iam_devu"
           make O=out HOSTCFLAGS="-fcommon" olddefconfig
           
-          # Compile kernel using all available CPU cores
+          # Compile kernel image and modules
           make O=out HOSTCFLAGS="-fcommon" -j$(nproc)
 
       - name: Archive Kernel Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: star2lte-osc-kernel-artifacts
+          name: star2lte-osr-kernel-artifacts
           path: |
             kernel-src/out/arch/arm64/boot/Image
             kernel-src/out/arch/arm64/boot/dts/exynos/*.dtb
