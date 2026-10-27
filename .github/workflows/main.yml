@@ -37,7 +37,9 @@ jobs:
         run: |
           echo "Downloading official Samsung OSC kernel source..."
           pip install gdown
-          gdown "https://drive.google.com/uc?id=1iJExl12AHvnfBxCUqbmWjLYrAqXVKaQw" -O kernel-archive
+          
+          # Use explicit file ID download to bypass Google Drive virus scan confirmation pages
+          gdown --id "1iJExl12AHvnfBxCUqbmWjLYrAqXVKaQw" -O kernel-archive
           
           echo "Preparing source directories..."
           mkdir -p kernel-src kernel-src-raw kernel-src-inner
