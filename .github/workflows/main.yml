@@ -44,6 +44,9 @@ jobs:
           echo "Extracting outer zip archive..."
           unzip -q kernel-archive -d kernel-src-raw
           
+          echo "Contents of kernel-src-raw:"
+          ls -la kernel-src-raw
+          
           echo "Checking for inner tar/gz archives..."
           INNER_TAR=$(find kernel-src-raw -name "*.tar.gz" -o -name "*.tgz" -o -name "*.tar" | head -n 1)
           
@@ -51,28 +54,40 @@ jobs:
             echo "Found inner archive: $INNER_TAR. Extracting..."
             tar -xf "$INNER_TAR" -C kernel-src-inner
             
-            # Flatten inner archive contents into kernel-src
+            echo "Contents of kernel-src-inner:"
+            ls -la kernel-src-inner
+            
             cd kernel-src-inner
-            FIRST_DIR=$(ls -d */ | head -n 1)
-            if [ -d "$FIRST_DIR" ]; then
-              mv "$FIRST_DIR"/* ../kernel-src/
-              mv "$FIRST_DIR"/.[!.]* ../kernel-src/ 2>/dev/null || true
+            # If there is a single wrapping directory, move its contents; otherwise move everything directly
+            ITEM_COUNT=$(ls -A | wc -l)
+            if [ "$ITEM_COUNT" -eq 1 ] && [ -d "$(ls -A)" ]; then
+              SINGLE_DIR=$(ls -A)
+              echo "Moving contents from single wrapping directory: $SINGLE_DIR"
+              mv "$SINGLE_DIR"/* ../kernel-src/
+              mv "$SINGLE_DIR"/.[!.]* ../kernel-src/ 2>/dev/null || true
             else
+              echo "Moving all extracted files directly to kernel-src"
               mv * ../kernel-src/
+              mv .[!.]* ../kernel-src/ 2>/dev/null || true
             fi
             cd ..
           else
-            # Fallback if no inner tarball exists
+            echo "No inner tarball found. Processing kernel-src-raw directly..."
             cd kernel-src-raw
-            FIRST_DIR=$(ls -d */ | head -n 1)
-            if [ -d "$FIRST_DIR" ]; then
-              mv "$FIRST_DIR"/* ../kernel-src/
-              mv "$FIRST_DIR"/.[!.]* ../kernel-src/ 2>/dev/null || true
+            ITEM_COUNT=$(ls -A | wc -l)
+            if [ "$ITEM_COUNT" -eq 1 ] && [ -d "$(ls -A)" ]; then
+              SINGLE_DIR=$(ls -A)
+              mv "$SINGLE_DIR"/* ../kernel-src/
+              mv "$SINGLE_DIR"/.[!.]* ../kernel-src/ 2>/dev/null || true
             else
               mv * ../kernel-src/
+              mv .[!.]* ../kernel-src/ 2>/dev/null || true
             fi
             cd ..
           fi
+          
+          echo "Verifying kernel-src root contents:"
+          ls -la kernel-src
           
           echo "Fixing file timestamps to prevent clock skew warnings..."
           cd kernel-src
