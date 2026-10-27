@@ -11,7 +11,7 @@ jobs:
       SUBARCH: arm64
       CROSS_COMPILE: aarch64-linux-android-
       CROSS_COMPILE_ARM32: arm-linux-androideabi-
-      ANDROID_MAJOR_VERSION: s
+      ANDROID_MAJOR_VERSION: q
     steps:
       - name: Install Dependencies
         run: |
@@ -44,9 +44,6 @@ jobs:
           echo "Extracting outer zip archive..."
           unzip -q kernel-archive -d kernel-src-raw
           
-          echo "Contents of kernel-src-raw:"
-          ls -la kernel-src-raw
-          
           echo "Checking for inner tar/gz archives..."
           INNER_TAR=$(find kernel-src-raw -name "*.tar.gz" -o -name "*.tgz" -o -name "*.tar" | head -n 1)
           
@@ -54,25 +51,19 @@ jobs:
             echo "Found inner archive: $INNER_TAR. Extracting..."
             tar -xf "$INNER_TAR" -C kernel-src-inner
             
-            echo "Contents of kernel-src-inner:"
-            ls -la kernel-src-inner
-            
+            # Flatten inner archive contents into kernel-src
             cd kernel-src-inner
-            # If there is a single wrapping directory, move its contents; otherwise move everything directly
             ITEM_COUNT=$(ls -A | wc -l)
             if [ "$ITEM_COUNT" -eq 1 ] && [ -d "$(ls -A)" ]; then
               SINGLE_DIR=$(ls -A)
-              echo "Moving contents from single wrapping directory: $SINGLE_DIR"
               mv "$SINGLE_DIR"/* ../kernel-src/
               mv "$SINGLE_DIR"/.[!.]* ../kernel-src/ 2>/dev/null || true
             else
-              echo "Moving all extracted files directly to kernel-src"
               mv * ../kernel-src/
               mv .[!.]* ../kernel-src/ 2>/dev/null || true
             fi
             cd ..
           else
-            echo "No inner tarball found. Processing kernel-src-raw directly..."
             cd kernel-src-raw
             ITEM_COUNT=$(ls -A | wc -l)
             if [ "$ITEM_COUNT" -eq 1 ] && [ -d "$(ls -A)" ]; then
@@ -85,9 +76,6 @@ jobs:
             fi
             cd ..
           fi
-          
-          echo "Verifying kernel-src root contents:"
-          ls -la kernel-src
           
           echo "Fixing file timestamps to prevent clock skew warnings..."
           cd kernel-src
