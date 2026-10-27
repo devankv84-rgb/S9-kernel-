@@ -35,31 +35,38 @@ jobs:
 
       - name: Download and Extract Kernel Source Zip
         run: |
+          echo "Checking available disk space..."
+          df -h
+          
           echo "Downloading kernel source zip from release..."
           wget -O kernel-source.zip "https://github.com/devankv84-rgb/S9-kernel-/releases/download/V1/SM-G965F_QQ_Opensource.zip"
           
-          echo "Extracting zip archive..."
+          echo "Extracting outer zip archive..."
           mkdir -p temp_extracted
           unzip -q kernel-source.zip -d temp_extracted
           
-          echo "Contents of extracted archive:"
-          ls -la temp_extracted
+          echo "Creating kernel-src directory..."
+          mkdir -p kernel-src
           
-          # Handle Samsung OSR packaging structure (which often wraps an inner tar/tar.gz or raw folders)
-          INNER_ARCHIVE=$(find temp_extracted -name "*.tar.gz" -o -name "*.tar" | head -n 1)
-          
-          if [ -n "$INNER_ARCHIVE" ]; then
-            echo "Found inner archive: $INNER_ARCHIVE. Extracting..."
-            tar -xf "$INNER_ARCHIVE" -C .
-            SRC_DIR=$(tar -tf "$INNER_ARCHIVE" | head -n 1 | cut -f1 -d"/")
-            mv "$SRC_DIR" kernel-src
+          INNER_ARCHIVE="temp_extracted/Kernel.tar.gz"
+          if [ -f "$INNER_ARCHIVE" ]; then
+            echo "Extracting Kernel.tar.gz directly into kernel-src..."
+            tar -xzf "$INNER_ARCHIVE" -C kernel-src
           else
-            # If the zip extracts directly into a source folder
-            FIRST_ITEM=$(ls -1 temp_extracted | head -n 1)
-            if [ -d "temp_extracted/$FIRST_ITEM" ]; then
-              mv "temp_extracted/$FIRST_ITEM" kernel-src
-            else
-              mv temp_extracted kernel-src
+            echo "Error: Kernel.tar.gz not found in extracted files!"
+            find temp_extracted -type f
+            exit 1
+          fi
+          
+          echo "Flattening structure if wrapped in a single subfolder..."
+          # Samsung OSR tarballs sometimes wrap everything in one root folder inside the tar
+          ITEM_COUNT=$(ls -A kernel-src | wc -l)
+          if [ "$ITEM_COUNT" -eq 1 ]; then
+            SUBDIR=$(ls -A kernel-src)
+            if [ -d "kernel-src/$SUBDIR" ]; then
+              echo "Moving contents out of subfolder: $SUBDIR"
+              mv kernel-src/$SUBDIR/* kernel-src/
+              rmdir kernel-src/$SUBDIR
             fi
           fi
           
@@ -67,8 +74,8 @@ jobs:
           if [ -f "kernel-src/init/uh.elf" ]; then
             echo "SUCCESS: uh.elf is present in init/ directory."
           else
-            echo "WARNING: uh.elf not found in init/ directory. Checking tree..."
-            find kernel-src -name "uh.elf"
+            echo "WARNING: uh.elf not found in init/ directory. Searching tree..."
+            find kernel-src -name "uh.elf" || echo "uh.elf not found anywhere in tree"
           fi
           
           echo "Fixing file timestamps to prevent clock skew warnings..."
