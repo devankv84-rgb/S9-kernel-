@@ -76,11 +76,18 @@ jobs:
           
           cd kernel-src
           
+          echo "Available defconfigs for Exynos 9810:"
+          ls -l arch/arm64/configs/ | grep -iE "star|exynos9810"
+          
           echo "Starting kernel build for Exynos 9810 (star2lte) using Samsung OSC source..."
           mkdir -p out
           
+          # Dynamically find the correct star2lte defconfig file name
+          DEFCONFIG_NAME=$(ls arch/arm64/configs/ | grep -iE "star2lte|starlte" | head -n 1)
+          echo "Using discovered defconfig: $DEFCONFIG_NAME"
+          
           # Apply the defconfig with HOSTCFLAGS="-fcommon" for modern host compiler compatibility
-          make O=out HOSTCFLAGS="-fcommon" exynos9810-star2lte_defconfig
+          make O=out HOSTCFLAGS="-fcommon" "$DEFCONFIG_NAME"
           
           # Set custom localversion
           scripts/config --file out/.config --set-str LOCALVERSION "-iam_devu"
@@ -98,3 +105,4 @@ jobs:
             kernel-src/out/arch/arm64/boot/dts/exynos/*.dtb
             kernel-src/out/arch/arm64/boot/dtbo.img
             kernel-src/out/.config
+            
