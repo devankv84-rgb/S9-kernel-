@@ -30,34 +30,50 @@ jobs:
             xz-utils \
             rsync \
             unzip \
-            tar
+            tar \
+            file
 
       - name: Download and Extract OSC Kernel Source
         run: |
           echo "Downloading official Samsung OSC kernel source..."
           pip install gdown
-          gdown "https://drive.google.com/uc?id=1iJExl12AHvnfBxCUqbmWjLYrAoXVKaQw" -O kernel-archive
+          gdown "https://drive.google.com/uc?id=1iJExl12AHvnfBxCUqbmWjLYrAqXVKaQw" -O kernel-archive
           
-          echo "Preparing source directory..."
-          mkdir -p kernel-src kernel-src-raw
+          echo "Preparing source directories..."
+          mkdir -p kernel-src kernel-src-raw kernel-src-inner
           
-          # Automatically detect archive type (Zip or Tar)
-          if file kernel-archive | grep -q "Zip archive"; then
-            unzip -q kernel-archive -d kernel-src-raw
+          echo "Extracting outer zip archive..."
+          unzip -q kernel-archive -d kernel-src-raw
+          
+          echo "Checking for inner tar/gz archives..."
+          INNER_TAR=$(find kernel-src-raw -name "*.tar.gz" -o -name "*.tgz" -o -name "*.tar" | head -n 1)
+          
+          if [ -n "$INNER_TAR" ]; then
+            echo "Found inner archive: $INNER_TAR. Extracting..."
+            tar -xf "$INNER_TAR" -C kernel-src-inner
+            
+            # Flatten inner archive contents into kernel-src
+            cd kernel-src-inner
+            FIRST_DIR=$(ls -d */ | head -n 1)
+            if [ -d "$FIRST_DIR" ]; then
+              mv "$FIRST_DIR"/* ../kernel-src/
+              mv "$FIRST_DIR"/.[!.]* ../kernel-src/ 2>/dev/null || true
+            else
+              mv * ../kernel-src/
+            fi
+            cd ..
           else
-            tar -xf kernel-archive -C kernel-src-raw
+            # Fallback if no inner tarball exists
+            cd kernel-src-raw
+            FIRST_DIR=$(ls -d */ | head -n 1)
+            if [ -d "$FIRST_DIR" ]; then
+              mv "$FIRST_DIR"/* ../kernel-src/
+              mv "$FIRST_DIR"/.[!.]* ../kernel-src/ 2>/dev/null || true
+            else
+              mv * ../kernel-src/
+            fi
+            cd ..
           fi
-          
-          # Flatten nested top-level directory if present in the OSC package
-          cd kernel-src-raw
-          FIRST_DIR=$(ls -d */ | head -n 1)
-          if [ -d "$FIRST_DIR" ]; then
-            mv "$FIRST_DIR"/* ../kernel-src/
-            mv "$FIRST_DIR"/.[!.]* ../kernel-src/ 2>/dev/null || true
-          else
-            mv * ../kernel-src/
-          fi
-          cd ..
           
           echo "Fixing file timestamps to prevent clock skew warnings..."
           cd kernel-src
@@ -105,4 +121,3 @@ jobs:
             kernel-src/out/arch/arm64/boot/dts/exynos/*.dtb
             kernel-src/out/arch/arm64/boot/dtbo.img
             kernel-src/out/.config
-            
