@@ -29,18 +29,35 @@ jobs:
             wget \
             xz-utils \
             rsync \
-            unzip
+            unzip \
+            tar
 
-      - name: Download Kernel Source from Google Drive
+      - name: Download and Extract OSC Kernel Source
         run: |
           echo "Downloading official Samsung OSC kernel source..."
           pip install gdown
+          gdown "https://drive.google.com/uc?id=1iJExl12AHvnfBxCUqbmWjLYrAoXVKaQw" -O kernel-archive
           
-          # Replace with your Google Drive file ID if it changed
-          gdown "https://drive.google.com/uc?id=1b9fXwpUTxZzOSv2o8A6MuW4_xhVJsP8c" -O kernel.zip
+          echo "Preparing source directory..."
+          mkdir -p kernel-src kernel-src-raw
           
-          echo "Extracting kernel source..."
-          unzip -q kernel.zip -d kernel-src
+          # Automatically detect archive type (Zip or Tar)
+          if file kernel-archive | grep -q "Zip archive"; then
+            unzip -q kernel-archive -d kernel-src-raw
+          else
+            tar -xf kernel-archive -C kernel-src-raw
+          fi
+          
+          # Flatten nested top-level directory if present in the OSC package
+          cd kernel-src-raw
+          FIRST_DIR=$(ls -d */ | head -n 1)
+          if [ -d "$FIRST_DIR" ]; then
+            mv "$FIRST_DIR"/* ../kernel-src/
+            mv "$FIRST_DIR"/.[!.]* ../kernel-src/ 2>/dev/null || true
+          else
+            mv * ../kernel-src/
+          fi
+          cd ..
           
           echo "Fixing file timestamps to prevent clock skew warnings..."
           cd kernel-src
@@ -59,17 +76,17 @@ jobs:
           
           cd kernel-src
           
-          echo "Starting kernel build for Exynos 9810 (star2lte) using official OSC source..."
+          echo "Starting kernel build for Exynos 9810 (star2lte) using Samsung OSC source..."
           mkdir -p out
           
-          # Apply the defconfig (adjust name if your OSC source uses a slightly different variant name)
+          # Apply the defconfig with HOSTCFLAGS="-fcommon" for modern host compiler compatibility
           make O=out HOSTCFLAGS="-fcommon" exynos9810-star2lte_defconfig
           
           # Set custom localversion
           scripts/config --file out/.config --set-str LOCALVERSION "-iam_devu"
           make O=out HOSTCFLAGS="-fcommon" olddefconfig
           
-          # Compile kernel using all available cores
+          # Compile kernel using all available CPU cores
           make O=out HOSTCFLAGS="-fcommon" -j$(nproc)
 
       - name: Archive Kernel Artifacts
