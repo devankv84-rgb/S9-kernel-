@@ -35,11 +35,8 @@ jobs:
 
       - name: Download and Extract OSC Kernel Source
         run: |
-          echo "Downloading official Samsung OSC kernel source..."
-          pip install gdown
-          
-          # Use explicit file ID download to bypass Google Drive virus scan confirmation pages
-          gdown --id "1iJExl12AHvnfBxCUqbmWjLYrAqXVKaQw" -O kernel-archive
+          echo "Downloading official Samsung OSC kernel source from GitHub Releases..."
+          wget -O kernel-archive "https://github.com/devankv84-rgb/S9-kernel-/releases/download/V1/SM-G965F_QQ_Opensource.zip"
           
           echo "Preparing source directories..."
           mkdir -p kernel-src kernel-src-raw kernel-src-inner
