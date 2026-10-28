@@ -14,26 +14,27 @@ jobs:
           repository: LineageOS/android_kernel_samsung_exynos9810
           ref: lineage-20
 
-      - name: Install Dependencies
+      - name: Install Build Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev git bc wget curl python3 zip zlib1g-dev
 
-      - name: Setup Toolchain
+      - name: Setup Official GCC 4.9 Toolchain
         run: |
-          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git toolchain/aarch64-linux-android-4.9
+          # Clone the official Android prebuilt GCC 4.9 toolchain for aarch64
+          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git toolchain/gcc-4.9
 
-      - name: Disable Werror for Modern GCC Compatibility
+      - name: Disable Werror (Compatibility Fallback)
         run: |
-          # Removes -Werror globally so unused variables/warnings don't abort the build
+          # Even with GCC 4.9, minor warnings can trigger errors depending on host toolchain components
           sed -i 's/-Werror//g' Makefile
           find . -name "Makefile" -o -name "Kbuild" | xargs sed -i 's/-Werror//g' || true
 
-      - name: Compile Kernel
+      - name: Compile Kernel with GCC 4.9
         run: |
           export ARCH=arm64
           export SUBARCH=arm64
-          export PATH="${{ github.workspace }}/toolchain/aarch64-linux-android-4.9/bin:$PATH"
+          export PATH="${{ github.workspace }}/toolchain/gcc-4.9/bin:$PATH"
           export CROSS_COMPILE=aarch64-linux-android-
 
           make O=out exynos9810-star2lte_defconfig
