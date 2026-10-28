@@ -1,125 +1,58 @@
-name: Compile Exynos 9810 Kernel (Official OSR Source - star2lte)
+name: Build Exynos9810 Kernel for star2lte
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Allows manual trigger from the Actions tab
 
 jobs:
-  build-kernel:
-    runs-on: ubuntu-latest
-    env:
-      ARCH: arm64
-      SUBARCH: arm64
-      CROSS_COMPILE: aarch64-linux-android-
-      CROSS_COMPILE_ARM32: arm-linux-androideabi-
-      ANDROID_MAJOR_VERSION: q
+  build:
+    runs-on: ubuntu-22.04
+
     steps:
+      - name: Checkout Kernel Source
+        uses: actions/checkout@v4
+        with:
+          repository: LineageOS/android_kernel_samsung_exynos9810
+          ref: lineage-20
+
       - name: Install Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            bc \
-            bison \
-            flex \
-            libssl-dev \
-            libelf-dev \
-            libncurses5-dev \
-            git \
-            python3 \
-            wget \
-            xz-utils \
-            rsync \
-            unzip \
-            tar \
-            file
+          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev git bc wget curl python3 zip zlib1g-dev
 
-      - name: Download and Extract Kernel Source Zip
+      - name: Setup Toolchain
         run: |
-          echo "Checking available disk space..."
-          df -h
-          
-          echo "Downloading kernel source zip from release..."
-          wget -O kernel-source.zip "https://github.com/devankv84-rgb/S9-kernel-/releases/download/V1/SM-G965F_QQ_Opensource.zip"
-          
-          echo "Extracting outer zip archive..."
-          mkdir -p temp_extracted
-          unzip -q kernel-source.zip -d temp_extracted
-          
-          echo "Creating kernel-src directory..."
-          mkdir -p kernel-src
-          
-          INNER_ARCHIVE="temp_extracted/Kernel.tar.gz"
-          if [ -f "$INNER_ARCHIVE" ]; then
-            echo "Extracting Kernel.tar.gz directly into kernel-src..."
-            tar -xzf "$INNER_ARCHIVE" -C kernel-src
-          else
-            echo "Error: Kernel.tar.gz not found in extracted files!"
-            find temp_extracted -type f
-            exit 1
-          fi
-          
-          echo "Flattening structure if wrapped in a single subfolder..."
-          # Samsung OSR tarballs sometimes wrap everything in one root folder inside the tar
-          ITEM_COUNT=$(ls -A kernel-src | wc -l)
-          if [ "$ITEM_COUNT" -eq 1 ]; then
-            SUBDIR=$(ls -A kernel-src)
-            if [ -d "kernel-src/$SUBDIR" ]; then
-              echo "Moving contents out of subfolder: $SUBDIR"
-              mv kernel-src/$SUBDIR/* kernel-src/
-              rmdir kernel-src/$SUBDIR
-            fi
-          fi
-          
-          echo "Verifying init/uh.elf presence in official source..."
-          if [ -f "kernel-src/init/uh.elf" ]; then
-            echo "SUCCESS: uh.elf is present in init/ directory."
-          else
-            echo "WARNING: uh.elf not found in init/ directory. Searching tree..."
-            find kernel-src -name "uh.elf" || echo "uh.elf not found anywhere in tree"
-          fi
-          
-          echo "Fixing file timestamps to prevent clock skew warnings..."
-          cd kernel-src
-          find . -exec touch {} +
+          # Cloning standard Android GCC/Clang toolchain or a suitable prebuilt toolchain for arm64
+          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git toolchain/aarch64-linux-android-4.9
 
-      - name: Setup GCC 4.9 Toolchains
+      - name: Compile Kernel
         run: |
-          mkdir -p toolchain/aarch64 toolchain/arm32
-          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9 toolchain/aarch64
-          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9 toolchain/arm32
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export PATH="${{ github.workspace }}/toolchain/aarch64-linux-android-4.9/bin:$PATH"
+          export CROSS_COMPILE=aarch64-linux-android-
 
-      - name: Build Kernel
+          # Check your configs directory to confirm exact defconfig name for star2lte
+          # E.g., exynos9810-star2lte_defconfig or starlte_defconfig
+          make O=out exynos9810-star2lte_defconfig
+          make O=out -j$(nproc)
+
+      - name: Package with AnyKernel3
         run: |
-          export PATH="${{ github.workspace }}/toolchain/aarch64/bin:${{ github.workspace }}/toolchain/arm32/bin:$PATH"
+          # Clone AnyKernel3
+          git clone https://github.com/osm0sis/AnyKernel3.git anykernel
           
-          cd kernel-src
+          # Copy compiled kernel image
+          cp out/arch/arm64/boot/Image anykernel/
           
-          echo "Available defconfigs for Exynos 9810:"
-          ls -l arch/arm64/configs/ | grep -iE "star|exynos9810"
+          # Configure anykernel script for star2lte target
+          cd anykernel
+          rm -rf .git README.md
           
-          echo "Starting kernel build for Exynos 9810 (star2lte)..."
-          mkdir -p out
-          
-          # Dynamically discover the correct star2lte defconfig file name
-          DEFCONFIG_NAME=$(ls arch/arm64/configs/ | grep -iE "star2lte|starlte" | head -n 1)
-          echo "Using discovered defconfig: $DEFCONFIG_NAME"
-          
-          # Apply defconfig with HOSTCFLAGS="-fcommon" for host tool compatibility
-          make O=out HOSTCFLAGS="-fcommon" "$DEFCONFIG_NAME"
-          
-          # Set custom localversion suffix to -iam_devu
-          scripts/config --file out/.config --set-str LOCALVERSION "-iam_devu"
-          make O=out HOSTCFLAGS="-fcommon" olddefconfig
-          
-          # Compile kernel image and modules
-          make O=out HOSTCFLAGS="-fcommon" -j$(nproc)
+          # Create zip file
+          zip -r9 ../star2lte-LineageKernel-AnyKernel3.zip *
 
-      - name: Archive Kernel Artifacts
+      - name: Upload Flashable ZIP Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: star2lte-osr-kernel-artifacts
-          path: |
-            kernel-src/out/arch/arm64/boot/Image
-            kernel-src/out/arch/arm64/boot/dts/exynos/*.dtb
-            kernel-src/out/arch/arm64/boot/dtbo.img
-            kernel-src/out/.config
+          name: star2lte-LineageKernel-AnyKernel3
+          path: star2lte-LineageKernel-AnyKernel3.zip
