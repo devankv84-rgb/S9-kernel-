@@ -1,4 +1,4 @@
-name: Build Exynos9810 Kernel for star2lte
+name: Build Exynos9810 Kernel (Pure Clang 12)
 
 on:
   workflow_dispatch: # Allows manual trigger from the Actions tab
@@ -14,31 +14,32 @@ jobs:
           repository: LineageOS/android_kernel_samsung_exynos9810
           ref: lineage-20
 
-      - name: Install Build Dependencies
+      - name: Install Build Dependencies & LLVM/Clang 12
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev git bc wget curl python3 zip zlib1g-dev
+          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev git bc wget curl python3 zip zlib1g-dev \
+            clang-12 lld-12 llvm-12 binutils-aarch64-linux-gnu
 
-      - name: Setup Official GCC 4.9 Toolchain
-        run: |
-          # Clone the official Android prebuilt GCC 4.9 toolchain for aarch64
-          git clone --depth=1 https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9.git toolchain/gcc-4.9
-
-      - name: Disable Werror (Compatibility Fallback)
-        run: |
-          # Even with GCC 4.9, minor warnings can trigger errors depending on host toolchain components
-          sed -i 's/-Werror//g' Makefile
-          find . -name "Makefile" -o -name "Kbuild" | xargs sed -i 's/-Werror//g' || true
-
-      - name: Compile Kernel with GCC 4.9
+      - name: Compile Kernel with Pure Clang 12
         run: |
           export ARCH=arm64
           export SUBARCH=arm64
-          export PATH="${{ github.workspace }}/toolchain/gcc-4.9/bin:$PATH"
-          export CROSS_COMPILE=aarch64-linux-android-
 
+          # Generate configuration
           make O=out exynos9810-star2lte_defconfig
-          make O=out -j$(nproc)
+
+          # Compile entirely using Clang 12 and LLVM utilities
+          make O=out -j$(nproc) \
+            CC=clang-12 \
+            LD=ld.lld-12 \
+            AR=llvm-ar-12 \
+            NM=llvm-nm-12 \
+            OBJCOPY=llvm-objcopy-12 \
+            OBJDUMP=llvm-objdump-12 \
+            STRIP=llvm-strip-12 \
+            READELF=llvm-readelf-12 \
+            CLANG_TRIPLE=aarch64-linux-gnu- \
+            CROSS_COMPILE=aarch64-linux-gnu-
 
       - name: Package with AnyKernel3
         run: |
